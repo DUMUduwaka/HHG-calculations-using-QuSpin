@@ -71,30 +71,20 @@ plt.show()
 # define basis
 basis = spinless_fermion_basis_1d(L, Nf=1)
 
-# define static and dynamic lists
+# define static and dynamic lists and build real-space Hamiltonian
 static = [["+-", hop_pm], ["-+", hop_mp]]
 dynamic = []
-
-# build real-space Hamiltonian
 H = hamiltonian(static, dynamic, basis=basis, dtype=np.float64)
-print(H)
-E,V = H.eigh()
 
 
-print(V)
-print(V[:,0])
-# print(np.shape(V))
-# print(V)
-'''
-GS = V[0]
-GS_E = E[0]
-print(GS_E)
-'''
 
 stat = []
 dyna = [["+-", hop_pm,ramp,ramp_args], ["-+", hop_mp,ramp_conj,ramp_args]]
 H_t = hamiltonian(stat,dyna,basis=basis, dtype=np.float64)
 
+# Define the initial state
+E_0 , psi_0 = H_t.eigsh(time=0 , k=1, which='SA')
+psi_0
 
 # calculate nearest eigenstate to energy at infinite temperature
 E_0,psi_0=H_t.eigh(time=1.0)
