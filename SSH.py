@@ -1,12 +1,13 @@
 from quspin.operators import hamiltonian  # Hamiltonians and operators
 from quspin.basis import spinless_fermion_basis_1d  # Hilbert space fermion basis
-from quspin.tools import measurements #
+from quspin.tools.measurements import obs_vs_time
+import scipy as sp
 import numpy as np  # generic math functions
 import matplotlib.pyplot as plt
 
 
 # Define model parameters
-L = 10               # system size
+L = 100               # system size
 J = 1.0              # uniform hopping contribution
 deltaJ = 0.1         # bond dimerisation
 Delta = 0.5          # staggered potential
@@ -94,14 +95,49 @@ print(psi_t)
 
 
 # Define current operator
+def current_ramp(t,F_0,omega_0,NN,a):
+    A_t = (F_0*10/omega_0)*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t)
+    return -1j*a*np.exp(-1j*A_t)
+
+def current_ramp_conj(t,F_0,omega_0,NN,a):
+    A_t = (F_0*10/omega_0)*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t)
+    return 1j*a*np.exp(1j*A_t)
+
+current_ramp_args = [F_0,omega_0,NN,a]
+
 current_static = []
-current_dynamic = []
+current_dynamic = [["+-", hop_pm,current_ramp,current_ramp_args], ["-+", hop_mp,current_ramp_conj,current_ramp_args]]
+current = hamiltonian(current_static,current_dynamic, basis=basis,dtype=np.float64)
+
+# calculate expectation values of current operator
+Obs_time = obs_vs_time(psi_t,t,dict(Energy=H_t, Current=current))
+current_time = Obs_time["Current"]
+print(np.size(current_time))
+
+plt.plot(t,current_time)
+#plt.show()
 
 
 
+current_omega = sp.fft.fft(current_time)
 
+print(current_omega)
+plt.plot(t,current_time)
+#plt.show()
 
+delta_t = t[1]-t[0]
+omega = sp.fft.fftfreq(num, delta_t) * 2 * np.pi  # Frequency array in rad/s
 
+# Obtain omega * J(omega)
+omega_J_omega = omega * current_omega
+S_omega = abs(omega_J_omega)**2
+# Plot J(t) and omega * J(omega) (magnitude)
+plt.figure(figsize=(14, 6))
+
+# Plot J(t)
+
+plt.plot(S_omega)
+plt.show()
 
 
 
