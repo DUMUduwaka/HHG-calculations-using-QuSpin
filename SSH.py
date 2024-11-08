@@ -1,6 +1,6 @@
 from quspin.operators import hamiltonian  # Hamiltonians and operators
 from quspin.basis import spinless_fermion_basis_1d  # Hilbert space fermion basis
-from quspin.tools.block_tools import block_diag_hamiltonian  # block diagonalisation
+from quspin.tools import measurements #
 import numpy as np  # generic math functions
 import matplotlib.pyplot as plt
 
@@ -77,17 +77,30 @@ dynamic = []
 H = hamiltonian(static, dynamic, basis=basis, dtype=np.float64)
 
 
-
+# define the Hamitonian in the presence of the external field
 stat = []
 dyna = [["+-", hop_pm,ramp,ramp_args], ["-+", hop_mp,ramp_conj,ramp_args]]
 H_t = hamiltonian(stat,dyna,basis=basis, dtype=np.float64)
 
 # Define the initial state
-E_0 , psi_0 = H_t.eigsh(time=0 , k=1, which='SA')
-psi_0
+E_0 , psi_0 = H_t.eigh(time=0.0)
+psi_0 = psi_0[:,0]
+print(psi_0)
 
-# calculate nearest eigenstate to energy at infinite temperature
-E_0,psi_0=H_t.eigh(time=1.0)
+# Evolve state in 
+psi_t = H_t.evolve(psi_0,0,t,eom='SE',iterate=True)
+print(psi_t)
+
+
+
+# Define current operator
+current_static = []
+current_dynamic = []
+
+
+
+
+
 
 
 
