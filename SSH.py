@@ -9,20 +9,27 @@ import matplotlib.pyplot as plt
 # Define model parameters
 L = 100               # system size
 J = 1.0              # uniform hopping contribution
-deltaJ = 0.1         # bond dimerisation
-Delta = 0.5          # staggered potential
+a = 2.0              # Lattice constant in a.u
+delta = 0.15         # Alternating shift of the atos casuing the dimerization (negative for topological phase)
+
 
 # Declare constants for Vector Potential
-a = 4                # Lattice constant in Å
-NN = 10              # Period of the pulse
-omega_0 = 32.9       # Frequency in THz
-F_0 = 10             # Amplitude in MV/cm
-t_0 = 0.52           # Intra chain hopping parameter in eV
+NN = 5                      # Period of the pulse
+omega_0 = 0.10865675         # Frequency in THz
+F_0 = 0.2                   # Amplitude 
+tf = 300  # Final time
+t_0 = 0.52                  # Intra chain hopping parameter in eV
 
 
-# Define the hopping elements 
-v = J + deltaJ # intracell hopping parameter
-w = J - deltaJ # intercell hopping parameter
+# Define atomic-site positions
+positions = np.zeros(L)
+
+for i in range(L):
+    positions[i]=((i+1)-((L+1)/2))*a-((-1)**(i+1))*delta
+
+# Define the hopping elements using the distances between atoms
+v = -np.exp(-(a-2*delta)) # intracell hopping parameter
+w = -np.exp(-(a+2*delta)) # intercell hopping parameter
 
 # Define site-coupling lists
 hop_pm = []
@@ -36,20 +43,20 @@ for i in range(L):
         hop_pm = hop_pm + [[-w, i, (i + 1) % L]]
         hop_mp = hop_mp + [[w, i, (i + 1) % L]]
 
-'''
-# hop_pm = [[-J - deltaJ * (-1) ** i, i, (i + 1) % L] for i in range(L)]  # PBC
-# hop_mp = [[+J + deltaJ * (-1) ** i, i, (i + 1) % L] for i in range(L)]  # PBC
-'''
 
-start,stop,num = 0, 2, 100     # time in fs
-t = np.linspace(start, stop, num=num)      # Time array
-A_t = (F_0*10/omega_0)*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t)     # Vector Potential
+start,stop,num = 0, tf, 250  # time in fs
+t = np.linspace(start, stop, num=num, endpoint=False)      # Time array
+A_t = F_0*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t)     # Vector Potential
+
+
 
 # Plot Vector potential; A(t)
 plt.plot(t,A_t)
-plt.xlabel("t(fs)")
-plt.ylabel("A(t)")
-#plt.show()
+plt.xlabel("time (fs)")
+plt.ylabel("Vector Potential A(t)")
+plt.show()
+
+'''
 
 def ramp(t,F_0,omega_0,NN,a):
     A_t = (F_0*10/omega_0)*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t)
@@ -76,6 +83,7 @@ basis = spinless_fermion_basis_1d(L, Nf=1)
 static = [["+-", hop_pm], ["-+", hop_mp]]
 dynamic = []
 H = hamiltonian(static, dynamic, basis=basis, dtype=np.float64)
+E,V = H.eigsh(time=0.0, k=1, which='SA')
 
 
 # define the Hamitonian in the presence of the external field
@@ -84,15 +92,14 @@ dyna = [["+-", hop_pm,ramp,ramp_args], ["-+", hop_mp,ramp_conj,ramp_args]]
 H_t = hamiltonian(stat,dyna,basis=basis, dtype=np.float64)
 
 # Define the initial state
-E_0 , psi_0 = H_t.eigh(time=0.0)
+E_0 , psi_0 = H_t.eigsh(time=0.0, k=1,which="SA")
+E,V =H_t.eigh(time=0)
 psi_0 = psi_0[:,0]
-print(psi_0)
+
 
 # Evolve state in 
 psi_t = H_t.evolve(psi_0,0,t,eom='SE',iterate=True)
-print(psi_t)
-
-
+# print(psi_t)
 
 # Define current operator
 def current_ramp(t,F_0,omega_0,NN,a):
@@ -109,39 +116,65 @@ current_static = []
 current_dynamic = [["+-", hop_pm,current_ramp,current_ramp_args], ["-+", hop_mp,current_ramp_conj,current_ramp_args]]
 current = hamiltonian(current_static,current_dynamic, basis=basis,dtype=np.float64)
 
+
 # calculate expectation values of current operator
 Obs_time = obs_vs_time(psi_t,t,dict(Energy=H_t, Current=current))
 current_time = Obs_time["Current"]
-print(np.size(current_time))
+#print(np.size(current_time))
 
+plt.figure()
 plt.plot(t,current_time)
-#plt.show()
+plt.xlabel('Time (fs)')
+plt.ylabel('Current')
+plt.title("Current vs Time")
+plt.show()
 
 
+# Fourier Transformation to obtain current in frequency domain
+T = t[-1]-t[0]        # total time 
+N = num               # Number of steps
+delta_t = t[1]-t[0]   # Time step
 
-current_omega = sp.fft.fft(current_time)
 
-print(current_omega)
-plt.plot(t,current_time)
-#plt.show()
+omega = np.linspace(-1*np.pi/delta_t, np.pi/delta_t, num, endpoint= False)
+delta_omega=omega[1]-omega[0]
 
-delta_t = t[1]-t[0]
-omega = sp.fft.fftfreq(num, delta_t) * 2 * np.pi  # Frequency array in rad/s
+for k in range(num):
+    current_time[k] = np.exp(1j*omega[0]*k*delta_t)*current_time[k]
 
-# Obtain omega * J(omega)
-omega_J_omega = omega * current_omega
+J_omega = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.fft(current_time)
+omega_J_omega = omega * J_omega
 S_omega = abs(omega_J_omega)**2
-# Plot J(t) and omega * J(omega) (magnitude)
-plt.figure(figsize=(14, 6))
 
-# Plot J(t)
+for k in range(num):
+    A_t[k] = np.exp(1j*omega[0]*k*delta_t)*A_t[k]
 
-plt.plot(S_omega)
+A_t_omega = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.fft(A_t)
+plt.plot(omega,np.abs(A_t_omega)**2)
 plt.show()
 
 
 
 
 
+# Plot J(t) and omega * J(omega) (magnitude)
+plt.figure()
+plt.plot(omega,S_omega)
+plt.yscale('log')
+plt.ylabel("S(Omega)")
+plt.show()
 
+W = sp.signal.windows.cosine(num)
+J_omega_W = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.fft(current_time*W)
+omega_J_omega_W = omega * J_omega_W
+S_omega_W = abs(omega_J_omega_W)**2
 
+'''
+'''
+# Plot J(t) and omega * J(omega) (magnitude)
+plt.figure()
+plt.plot(S_omega_W)
+plt.yscale('log')
+plt.ylabel("S(Omega)_W")
+plt.show()
+'''
