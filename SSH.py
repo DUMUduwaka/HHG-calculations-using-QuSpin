@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 
 # Define model parameters
-L = 100           # system size
+L = 10           # system size
 J = 1.0           # uniform hopping contribution
 a = 2.0           # Lattice constant in a.u
 delta = 0.15      # Alternating shift of the atos casuing the dimerization (negative for topological phase)
@@ -28,9 +28,10 @@ for i in range(L):
 
 
 # Define the hopping elements using the distances between atoms
-v = -np.exp(-(a-2*delta)) # intracell hopping parameter
-w = -np.exp(-(a+2*delta)) # intercell hopping parameter
-
+#v = -np.exp(-(a-2*delta)) # intracell hopping parameter
+#w = -np.exp(-(a+2*delta)) # intercell hopping parameter
+v = 1.1
+w = 0.9
 
 # Define site-coupling lists
 hop_pm = []
@@ -44,8 +45,10 @@ for i in range(L):
         hop_pm = hop_pm + [[-w, i, (i + 1) % L]]
         hop_mp = hop_mp + [[w, i, (i + 1) % L]]
 
+print(hop_pm)
+print(hop_mp)
 
-# Define the time arrayn and the Vector potential 
+# Define the time array and the Vector potential 
 start,stop,num = 0, tf, 250  # time in fs
 t = np.linspace(start, stop, num=num, endpoint=False)         # Time array
 A_t = F_0*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t)   # Vector Potential
@@ -56,10 +59,9 @@ plt.plot(t*t_conversion,A_t)
 plt.title("Vector Potential vs Time(fs)")
 plt.xlabel("time (fs)")
 plt.ylabel("Vector Potential A(t)")
-plt.show()
+#plt.show()
 
 # Define time dependent part in the Hamiltonian
-
 def ramp(t,F_0,omega_0,NN):
     A_t = F_0*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t) 
     return np.exp(-1j*A_t)
@@ -72,8 +74,8 @@ ramp_args = [F_0,omega_0,NN,a]
 
 
 print(ramp_args)
-plt.plot(t,ramp(t,F_0,omega_0,NN,a))
-plt.show()
+plt.plot(t,ramp(t,F_0,omega_0,NN))
+#plt.show()
 
 
 ## Construct single-particle Hamiltonian 
