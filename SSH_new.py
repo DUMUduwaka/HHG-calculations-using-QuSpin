@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 L = 10           # system size
 J = 1.0           # uniform hopping contribution
 a = 2.0           # Lattice constant in a.u
-delta = 0.15      # Alternating shift of the atos casuing the dimerization (negative for topological phase)
+delta = -0.15      # Alternating shift of the atos casuing the dimerization (negative for topological phase)
 
 
 # Declare constants for Vector Potential
@@ -48,7 +48,7 @@ for i in range(L):
 
 
 # Define the time array and the Vector potential 
-start,stop,num = 0, tf, 300  # time in fs
+start,stop,num = 0, tf, 200  # time in fs
 t = np.linspace(start, stop, num=num, endpoint=False)         # Time array
 A_t = F_0*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t)   # Vector Potential
 
@@ -87,7 +87,10 @@ ramp_args = [F_0,omega_0,NN,a, delta]
 basis = spinless_fermion_basis_1d(L, Nf=1)
 
 # define static and dynamic lists and build real-space Hamiltonian
-static = [["+-", hop_pm_v],["+-", hop_pm_w], ["-+", hop_mp_v],["-+", hop_mp_w]]
+static = [["+-", hop_pm_v],
+          ["+-", hop_pm_w], 
+          ["-+", hop_mp_v],
+          ["-+", hop_mp_w]]
 dynamic = []
 H = hamiltonian(static, dynamic, basis=basis, dtype=np.float64)
 E,V = H.eigsh(time=0.0, k=1, which='SA') # the Smallest Algeberic Eigen value and conresponding eigen state. 
@@ -97,7 +100,10 @@ print(V)
 
 # define the Hamitonian in the presence of the external field
 stat = []
-dyna = [["+-", hop_pm_v,ramp_v,ramp_args], ["+-", hop_pm_w,ramp_w,ramp_args],["-+", hop_mp_v,ramp_v_conj,ramp_args],["-+", hop_mp_w,ramp_w_conj,ramp_args]]
+dyna = [["+-", hop_pm_v,ramp_v,ramp_args], 
+        ["+-", hop_pm_w,ramp_w,ramp_args],
+        ["-+", hop_mp_v,ramp_v_conj,ramp_args],
+        ["-+", hop_mp_w,ramp_w_conj,ramp_args]]
 H_t = hamiltonian(stat,dyna,basis=basis, dtype=np.float64)
 
 '''
@@ -125,7 +131,10 @@ def current_ramp_conj(t,F_0,omega_0,NN,a):
 current_ramp_args = [F_0,omega_0,NN,a]
 
 current_static = []
-current_dynamic = [["+-", hop_pm_v,current_ramp,current_ramp_args],["+-", hop_pm_w,current_ramp,current_ramp_args], ["-+", hop_mp_v,current_ramp_conj,current_ramp_args],["-+", hop_mp_w,current_ramp_conj,current_ramp_args]]
+current_dynamic = [["+-", hop_pm_v,current_ramp,current_ramp_args],
+                   ["+-", hop_pm_w,current_ramp,current_ramp_args], 
+                   ["-+", hop_mp_v,current_ramp_conj,current_ramp_args],
+                   ["-+", hop_mp_w,current_ramp_conj,current_ramp_args]]
 current = hamiltonian(current_static,current_dynamic, basis=basis,dtype=np.float64)
 
 # Define current operator
@@ -135,7 +144,7 @@ displacement_static=[["n",X_i]]
 displacement_dynamic=[]
 displacement = hamiltonian(displacement_static,displacement_dynamic,basis=basis, dtype=np.float64)
 
-
+print("displacement list",displacement_static)
 
 # calculate expectation values of current operator
 Obs_time = obs_vs_time(psi_t,t,dict(Energy=H_t, Current=current, Displacement=displacement))
@@ -156,10 +165,12 @@ plt.show()
 plt.figure()
 plt.plot(t*t_conversion,displacement_time)
 plt.xlabel('Time (fs)')
-plt.ylabel('Current')
+plt.ylabel('Displacement')
 plt.title("Displacement vs Time")
 plt.show()
 
+#velocity_time = np.gradient(displacement_time,t)
+#acceleration_time = np.gradie
 
 # Fourier Transformation to obtain current in frequency domain
 T = t[-1]-t[0]        # total time 
@@ -170,24 +181,35 @@ delta_t = t[1]-t[0]   # Time step
 omega = np.linspace(-1*np.pi/delta_t, np.pi/delta_t, num, endpoint= False)
 delta_omega=omega[1]-omega[0]
 
+factor=np.zeros(num)
 for k in range(num):
-    current_time[k] = np.exp(1j*omega[0]*k*delta_t)*current_time[k]
+    factor[k] = np.exp(1j*omega[0]*k*delta_t)
 
+current_time = factor*current_time
 J_omega = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.fft(current_time)
 omega_J_omega = omega * J_omega
 S_omega = abs(omega_J_omega)**2
-
+'''
 for k in range(num):
     A_t[k] = np.exp(1j*omega[0]*k*delta_t)*A_t[k]
-
 '''
-A_t_omega = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.fft(A_t)
+
+A_t_omega = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.fft(factor*A_t)
 plt.plot(omega,np.abs(A_t_omega)**2)
 plt.yscale('log')
+plt.title("FFT of AT")
 plt.xlim(left=0)
 plt.show()
-'''
 
+print("length",np.size(A_t))
+X_t_omega = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.fft(factor*displacement_time)
+plt.plot(omega,np.abs(X_t_omega)**2)
+plt.yscale('log')
+plt.title("FFT of Xt")
+plt.xlim(left=0)
+plt.show()
+
+print("length of X",np.size(displacement_time))
 # Plot J(t) and omega * J(omega) (magnitude)
 plt.figure()
 plt.plot(omega,S_omega)
