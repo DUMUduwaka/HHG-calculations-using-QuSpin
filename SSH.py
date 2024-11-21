@@ -4,19 +4,20 @@ from quspin.tools.measurements import obs_vs_time   # Tools for measurements
 import scipy as sp
 import numpy as np  
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 
 
 # Define model parameters
-L = 10           # system size
+L = 100           # system size
 J = 1.0           # uniform hopping contribution
 a = 2.0           # Lattice constant in a.u
-delta = 0.15      # Alternating shift of the atos casuing the dimerization (negative for topological phase)
+delta = 0.15     # Alternating shift of the atos casuing the dimerization (negative for topological phase)
 
 
 # Declare constants for Vector Potential
 NN = 5                               # Period of the pulse
 omega_0 = 0.0075                     # Frequency in THz
-F_0 = 0.2                            # Amplitude 
+A_0 = 0.2                            # Amplitude 
 tf = 2*np.pi*NN/omega_0              # Final time
 t_conversion = 2.4188843265864e-2    # Conversion of time from a.u to fs
 
@@ -28,30 +29,30 @@ for i in range(L):
 
 
 # Define the hopping elements using the distances between atoms
-#v = -np.exp(-(a-2*delta)) # intracell hopping parameter
-#w = -np.exp(-(a+2*delta)) # intercell hopping parameter
-v = 1.1
-w = 0.9
+v = -np.exp(-(a-2*delta)) # intracell hopping parameter
+w = -np.exp(-(a+2*delta)) # intercell hopping parameter
 
-# Define site-coupling lists
-hop_pm = []
-hop_mp = []
 
-for i in range(L):
+# Define site-coupling lists with out boundry conditions
+hop_pm_v = []
+hop_pm_w = []
+hop_mp_v = []
+hop_mp_w = []
+
+for i in range(L-1):
     if i%2 == 0:
-        hop_pm = hop_pm + [[-v, i, (i + 1) % L]]
-        hop_mp = hop_mp + [[v, i, (i + 1) % L]]
+        hop_pm_v = hop_pm_v + [[-v, i, i+1]] #(i + 1) % L]
+        hop_mp_v = hop_mp_v + [[v, i, i+1]]
     else:
-        hop_pm = hop_pm + [[-w, i, (i + 1) % L]]
-        hop_mp = hop_mp + [[w, i, (i + 1) % L]]
+        hop_pm_w = hop_pm_w + [[-w, i, i+1]]
+        hop_mp_w = hop_mp_w + [[w, i, i+1]]
 
-print(hop_pm)
-print(hop_mp)
+
 
 # Define the time array and the Vector potential 
-start,stop,num = 0, tf, 250  # time in fs
+start,stop,num = 0, tf, 200                                   # time in fs
 t = np.linspace(start, stop, num=num, endpoint=False)         # Time array
-A_t = F_0*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t)   # Vector Potential
+A_t = A_0*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t)   # Vector Potential
 
 
 # Plot Vector potential A(t)
@@ -61,78 +62,109 @@ plt.xlabel("time (fs)")
 plt.ylabel("Vector Potential A(t)")
 #plt.show()
 
-# Define time dependent part in the Hamiltonian
-def ramp(t,F_0,omega_0,NN):
-    A_t = F_0*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t) 
-    return np.exp(-1j*A_t)
 
-def ramp_conj(t,F_0,omega_0,NN):
-    A_t = F_0*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t) 
-    return np.exp(1j*A_t)
+# Define time dependent parts in the Hamiltonian
+def ramp_v(t,A_0,omega_0,NN,a, delta):
+    A_t = A_0*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t) 
+    return np.exp((-1j*(a-delta)*A_t))
 
-ramp_args = [F_0,omega_0,NN,a]
+def ramp_w(t,A_0,omega_0,NN,a, delta):
+    A_t = A_0*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t) 
+    return np.exp((-1j*(a+delta)*A_t))
+
+def ramp_v_conj(t,A_0,omega_0,NN,a, delta):
+    A_t = A_0*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t) 
+    return np.exp(1j*(a-delta)*A_t)
+
+def ramp_w_conj(t,A_0,omega_0,NN,a, delta):
+    A_t = A_0*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t) 
+    return np.exp(1j*(a+delta)*A_t)
+
+ramp_args = [A_0,omega_0,NN,a, delta]
 
 
-print(ramp_args)
-plt.plot(t,ramp(t,F_0,omega_0,NN))
-#plt.show()
-
-
-## Construct single-particle Hamiltonian 
+## Construct single -praticle Hamiltonian
 
 # define basis
 basis = spinless_fermion_basis_1d(L, Nf=1)
 
 # define static and dynamic lists and build real-space Hamiltonian
-static = [["+-", hop_pm], ["-+", hop_mp]]
+static = [["+-", hop_pm_v],
+          ["+-", hop_pm_w], 
+          ["-+", hop_mp_v],
+          ["-+", hop_mp_w]]
 dynamic = []
 H = hamiltonian(static, dynamic, basis=basis, dtype=np.float64)
-E,V = H.eigsh(time=0.0, k=1, which='SA')
 
 
 # define the Hamitonian in the presence of the external field
 stat = []
-dyna = [["+-", hop_pm,ramp,ramp_args], ["-+", hop_mp,ramp_conj,ramp_args]]
+dyna = [["+-", hop_pm_v,ramp_v,ramp_args], 
+        ["+-", hop_pm_w,ramp_w,ramp_args],
+        ["-+", hop_mp_v,ramp_v_conj,ramp_args],
+        ["-+", hop_mp_w,ramp_w_conj,ramp_args]]
 H_t = hamiltonian(stat,dyna,basis=basis, dtype=np.float64)
 
-# Define the initial state
+Et, Vt = H_t.eigsh(time=0.0, k=1, which='SA')
+print(Vt)
+print(np.sqrt(0.28363019**2+0.13983531**2))
+
 E_0 , psi_0 = H_t.eigsh(time=0.0, k=1,which="SA")
 E,V =H_t.eigh(time=0)
 psi_0 = psi_0[:,0]
 
-
 # Evolve state in 
 psi_t = H_t.evolve(psi_0,0,t,eom='SE',iterate=True)
-# print(psi_t)
 
 # Define current operator
-def current_ramp(t,F_0,omega_0,NN,a):
-    A_t = (F_0*10/omega_0)*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t)
+def current_ramp(t,A_0,omega_0,NN,a):
+    A_t = (A_0*10/omega_0)*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t)
     return -1j*a*np.exp(-1j*A_t)
 
-def current_ramp_conj(t,F_0,omega_0,NN,a):
-    A_t = (F_0*10/omega_0)*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t)
+def current_ramp_conj(t,A_0,omega_0,NN,a):
+    A_t = (A_0*10/omega_0)*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t)
     return 1j*a*np.exp(1j*A_t)
 
-current_ramp_args = [F_0,omega_0,NN,a]
+current_ramp_args = [A_0,omega_0,NN,a]
 
 current_static = []
-current_dynamic = [["+-", hop_pm,current_ramp,current_ramp_args], ["-+", hop_mp,current_ramp_conj,current_ramp_args]]
+current_dynamic = [["+-", hop_pm_v,current_ramp,current_ramp_args],
+                   ["+-", hop_pm_w,current_ramp,current_ramp_args], 
+                   ["-+", hop_mp_v,current_ramp_conj,current_ramp_args],
+                   ["-+", hop_mp_w,current_ramp_conj,current_ramp_args]]
 current = hamiltonian(current_static,current_dynamic, basis=basis,dtype=np.float64)
 
+# Define current operator
+X_i = [[positions[i],i] for i in range(L)]
+
+displacement_static=[["n",X_i]]
+displacement_dynamic=[]
+displacement = hamiltonian(displacement_static,displacement_dynamic,basis=basis, dtype=np.float64)
+
+print("displacement list",displacement_static)
 
 # calculate expectation values of current operator
-Obs_time = obs_vs_time(psi_t,t,dict(Energy=H_t, Current=current))
+Obs_time = obs_vs_time(psi_t,t,dict(Energy=H_t, Current=current, Displacement=displacement))
 current_time = Obs_time["Current"]
+displacement_time = Obs_time["Displacement"]
 #print(np.size(current_time))
 
 plt.figure()
-plt.plot(t,current_time)
+plt.plot(t*t_conversion,current_time)
 plt.xlabel('Time (fs)')
 plt.ylabel('Current')
 plt.title("Current vs Time")
 plt.show()
 
+plt.figure()
+plt.plot(t*t_conversion,displacement_time)
+plt.xlabel('Time (fs)')
+plt.ylabel('Displacement')
+plt.title("Displacement vs Time")
+plt.show()
+
+#velocity_time = np.gradient(displacement_time,t)
+#acceleration_time = np.gradie
 
 # Fourier Transformation to obtain current in frequency domain
 T = t[-1]-t[0]        # total time 
@@ -143,38 +175,39 @@ delta_t = t[1]-t[0]   # Time step
 omega = np.linspace(-1*np.pi/delta_t, np.pi/delta_t, num, endpoint= False)
 delta_omega=omega[1]-omega[0]
 
+factor = np.zeros(num)
 for k in range(num):
-    current_time[k] = np.exp(1j*omega[0]*k*delta_t)*current_time[k]
+    factor[k] = np.exp(1j*omega[0]*k*delta_t)
 
+current_time = factor*current_time
 J_omega = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.fft(current_time)
 omega_J_omega = omega * J_omega
 S_omega = abs(omega_J_omega)**2
 
-for k in range(num):
-    A_t[k] = np.exp(1j*omega[0]*k*delta_t)*A_t[k]
 
-A_t_omega = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.fft(A_t)
+A_t_omega = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.fft(factor*A_t)
 plt.plot(omega,np.abs(A_t_omega)**2)
+plt.yscale('log')
+plt.title("FFT of AT")
+plt.xlim(left=0)
 plt.show()
 
+print("length",np.size(A_t))
+X_t_omega = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.fft(factor*displacement_time)
+plt.plot(omega,np.abs(X_t_omega)**2)
+plt.yscale('log')
+plt.title("FFT of Xt")
+plt.xlim(left=0)
+plt.show()
 
+print("length of X",np.size(displacement_time))
 # Plot J(t) and omega * J(omega) (magnitude)
 plt.figure()
 plt.plot(omega,S_omega)
 plt.yscale('log')
 plt.ylabel("S(Omega)")
+plt.xlim(left=0)
 plt.show()
 
-W = sp.signal.windows.cosine(num)
-J_omega_W = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.fft(current_time*W)
-omega_J_omega_W = omega * J_omega_W
-S_omega_W = abs(omega_J_omega_W)**2
 
-
-# Plot J(t) and omega * J(omega) (magnitude)
-plt.figure()
-plt.plot(S_omega_W)
-plt.yscale('log')
-plt.ylabel("S(Omega)_W")
-plt.show()
 
