@@ -61,7 +61,7 @@ plt.plot(t*t_conversion,A_t)
 plt.title("Vector Potential vs Time(fs)")
 plt.xlabel("time (fs)")
 plt.ylabel("Vector Potential A(t)")
-plt.savefig('Vector Potential.png')
+plt.savefig('Plots/Vector Potential.png')
 
 
 
@@ -170,7 +170,7 @@ plt.plot(t*t_conversion,current_total)
 plt.xlabel('Time (fs)')
 plt.ylabel('Current')
 plt.title("Current vs Time")
-plt.savefig('Current.png')
+plt.savefig('Plots/Current.png')
 
 
 plt.figure()
@@ -178,7 +178,7 @@ plt.plot(t*t_conversion,displacement_total)
 plt.xlabel('Time (fs)')
 plt.ylabel('Displacement')
 plt.title("Displacement vs Time")
-plt.savefig('Displacement.png')
+plt.savefig('Plots/Displacement.png')
 
 
 # Fourier Transformation to obtain current in frequency domain
@@ -211,7 +211,7 @@ plt.plot(omega,np.abs(A_t_omega)**2)
 plt.yscale('log')
 plt.title("FFT of AT")
 plt.xlim(left=0)
-plt.savefig('FFT of A(t).png')
+plt.savefig('Plots/FFT of A(t).png')
 
 
 plt.figure()
@@ -219,7 +219,7 @@ plt.plot(omega,np.abs(X_omega)**2)
 plt.yscale('log')
 plt.title("FFT of Xt")
 plt.xlim(left=0)
-plt.savefig('FFT of X(t).png')
+plt.savefig('Plots/FFT of X(t).png')
 
 
 # Plot J(t) and omega * J(omega) (magnitude)
@@ -228,7 +228,7 @@ plt.plot(omega,S_omega)
 plt.yscale('log')
 plt.ylabel("S(Omega)")
 plt.xlim(left=0)
-plt.savefig('S(Omega).png')
+plt.savefig('Plots/S(Omega).png')
 
 # Plot P_omega
 plt.figure()
@@ -236,7 +236,7 @@ plt.plot(omega,P_omega)
 plt.yscale('log')
 plt.ylabel("P(Omega)")
 plt.xlim(left=0)
-plt.savefig('P(Omega).png')
+plt.savefig('Plots/P(Omega).png')
 
 
 
