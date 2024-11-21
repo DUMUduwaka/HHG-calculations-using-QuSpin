@@ -15,10 +15,10 @@ delta = 0.15     # Alternating shift of the atos casuing the dimerization (negat
 
 
 # Declare constants for Vector Potential
-NN = 5                               # Period of the pulse
-omega_0 = 0.075                     # Frequency in THz
+N_cyc = 5                            # Period of the pulse
+omega_0 = 0.075                      # Frequency in a.u
 A_0 = 0.2                            # Amplitude 
-tf = 2*np.pi*NN/omega_0              # Final time
+tf = 2*np.pi*N_cyc/omega_0           # Final time
 t_conversion = 2.4188843265864e-2    # Conversion of time from a.u to fs
 
 
@@ -41,22 +41,21 @@ hop_mp_w = []
 
 for i in range(L-1):
     if i%2 == 0:
-        hop_pm_v = hop_pm_v + [[-v, i, i+1]] #(i + 1) % L]
+        hop_pm_v = hop_pm_v + [[-v, i, i+1]]
         hop_mp_v = hop_mp_v + [[v, i, i+1]]
     else:
         hop_pm_w = hop_pm_w + [[-w, i, i+1]]
         hop_mp_w = hop_mp_w + [[w, i, i+1]]
 
 
-
 # Define the time array and the Vector potential 
-start,stop,num = 0, tf, 250                                   # time in fs
+start,stop,num = 0, tf, 200                                   # time in fs
 t = np.linspace(start, stop, num=num, endpoint=False)         # Time array
-A_t = A_0*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t)   # Vector Potential
+A_t = A_0*((np.sin(omega_0*t/(2*N_cyc)))**2)*np.sin(omega_0*t)   # Vector Potential
 
 
 # Plot Vector potential A(t)
-plt.figure(1)
+plt.figure()
 plt.plot(t*t_conversion,A_t)
 plt.title("Vector Potential vs Time(fs)")
 plt.xlabel("time (fs)")
@@ -64,29 +63,27 @@ plt.ylabel("Vector Potential A(t)")
 plt.savefig('Plots/Vector Potential.png')
 
 
-
 # Define time dependent parts in the Hamiltonian
-def ramp_v(t,A_0,omega_0,NN,a, delta):
-    A_t = A_0*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t) 
+def ramp_v(t,A_0,omega_0,N_cyc,a, delta):
+    A_t = A_0*((np.sin(omega_0*t/(2*N_cyc)))**2)*np.sin(omega_0*t) 
     return np.exp((-1j*(a-delta)*A_t))
 
-def ramp_w(t,A_0,omega_0,NN,a, delta):
-    A_t = A_0*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t) 
+def ramp_w(t,A_0,omega_0,N_cyc,a, delta):
+    A_t = A_0*((np.sin(omega_0*t/(2*N_cyc)))**2)*np.sin(omega_0*t) 
     return np.exp((-1j*(a+delta)*A_t))
 
-def ramp_v_conj(t,A_0,omega_0,NN,a, delta):
-    A_t = A_0*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t) 
+def ramp_v_conj(t,A_0,omega_0,N_cyc,a, delta):
+    A_t = A_0*((np.sin(omega_0*t/(2*N_cyc)))**2)*np.sin(omega_0*t) 
     return np.exp(1j*(a-delta)*A_t)
 
-def ramp_w_conj(t,A_0,omega_0,NN,a, delta):
-    A_t = A_0*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t) 
+def ramp_w_conj(t,A_0,omega_0,N_cyc,a, delta):
+    A_t = A_0*((np.sin(omega_0*t/(2*N_cyc)))**2)*np.sin(omega_0*t) 
     return np.exp(1j*(a+delta)*A_t)
 
-ramp_args = [A_0,omega_0,NN,a, delta]
+ramp_args = [A_0,omega_0,N_cyc,a, delta]
 
 
 ## Construct single -praticle Hamiltonian
-
 # define basis
 basis = spinless_fermion_basis_1d(L, Nf=1)
 
@@ -109,15 +106,15 @@ dyna = [["+-", hop_pm_v,ramp_v,ramp_args],
 H_t = hamiltonian(stat,dyna,basis=basis, dtype=np.float64)
 
 # Define current operator
-def current_ramp(t,A_0,omega_0,NN,a):
-    A_t = (A_0*10/omega_0)*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t)
+def current_ramp(t,A_0,omega_0,N_cyc,a):
+    A_t = (A_0/omega_0)*((np.sin(omega_0*t/(2*N_cyc)))**2)*np.sin(omega_0*t)
     return -1j*a*np.exp(-1j*A_t)
 
-def current_ramp_conj(t,A_0,omega_0,NN,a):
-    A_t = (A_0*10/omega_0)*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t)
+def current_ramp_conj(t,A_0,omega_0,N_cyc,a):
+    A_t = (A_0/omega_0)*((np.sin(omega_0*t/(2*N_cyc)))**2)*np.sin(omega_0*t)
     return 1j*a*np.exp(1j*A_t)
 
-current_ramp_args = [A_0,omega_0,NN,a]
+current_ramp_args = [A_0,omega_0,N_cyc,a]
 
 current_static = []
 current_dynamic = [["+-", hop_pm_v,current_ramp,current_ramp_args],
@@ -195,16 +192,16 @@ for k in range(num):
     factor[k] = np.exp(1j*omega[0]*k*delta_t)
 
 current_total = factor*current_total
-J_omega = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.fft(current_total)
+J_omega = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.ifft(current_total)
 omega_J_omega = omega * J_omega
 S_omega = abs(omega_J_omega)**2
 
 
 displacement_total = factor*displacement_total
-X_omega = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.fft(displacement_total)
+X_omega = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.ifft(displacement_total)
 P_omega = abs(omega**2*X_omega)**2
 
-A_t_omega = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.fft(factor*A_t)
+A_t_omega = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.ifft(factor*A_t)
 
 plt.figure()
 plt.plot(omega,np.abs(A_t_omega)**2)
@@ -238,5 +235,4 @@ plt.ylabel("P(Omega)")
 plt.xlim(left=0)
 plt.savefig('Plots/P(Omega).png')
 
-
-
+# Use density matrix to get harmonic spectrum

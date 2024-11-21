@@ -5,13 +5,14 @@ import scipy as sp
 import numpy as np  
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-
+from matplotlib.colors import LogNorm
+import numpy as np
 
 # Define model parameters
 L = 100           # system size
 J = 1.0           # uniform hopping contribution
 a = 2.0           # Lattice constant in a.u
-delta = 0.15     # Alternating shift of the atos casuing the dimerization (negative for topological phase)
+delta = -0.15     # Alternating shift of the atos casuing the dimerization (negative for topological phase)
 
 
 # Declare constants for Vector Potential
@@ -55,33 +56,6 @@ t = np.linspace(start, stop, num=num, endpoint=False)         # Time array
 A_t = A_0*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t)   # Vector Potential
 
 
-# Plot Vector potential A(t)
-plt.plot(t*t_conversion,A_t)
-plt.title("Vector Potential vs Time(fs)")
-plt.xlabel("time (fs)")
-plt.ylabel("Vector Potential A(t)")
-#plt.show()
-
-
-# Define time dependent parts in the Hamiltonian
-def ramp_v(t,A_0,omega_0,NN,a, delta):
-    A_t = A_0*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t) 
-    return np.exp((-1j*(a-delta)*A_t))
-
-def ramp_w(t,A_0,omega_0,NN,a, delta):
-    A_t = A_0*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t) 
-    return np.exp((-1j*(a+delta)*A_t))
-
-def ramp_v_conj(t,A_0,omega_0,NN,a, delta):
-    A_t = A_0*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t) 
-    return np.exp(1j*(a-delta)*A_t)
-
-def ramp_w_conj(t,A_0,omega_0,NN,a, delta):
-    A_t = A_0*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t) 
-    return np.exp(1j*(a+delta)*A_t)
-
-ramp_args = [A_0,omega_0,NN,a, delta]
-
 
 ## Construct single -praticle Hamiltonian
 
@@ -97,12 +71,23 @@ dynamic = []
 H = hamiltonian(static, dynamic, basis=basis, dtype=np.float64)
 E,V = H.eigh() # the Smallest Algeberic Eigen value and conresponding eigen state. 
 
+prob_amplitude = np.transpose(V)**2
 
-print(V)
 print("Energy is", E)
 
+dense = np.zeros((L*L,3))
 
-'''
+for i in range(len(E)):
+    for j in range(len(positions)):
+        k = i*len(positions)+j
+        dense[k,0] = positions[j]
+        dense[k,1] = E[i]
+        dense[k,2] = prob_amplitude[i,j]
+print(dense)
+
+x, y, z = dense[:,0],dense[:,1],dense[:,1]
+
+
 # Plot probability amplitudes against positions of lattice
 x_positions = positions
 y_positions = E
@@ -115,127 +100,27 @@ for i in range(len(x_positions)):
     for j in range(len(y_positions)):
         density[i,j]= prob_amplitude[i,j]
 
-plt.figure(2)
+
+plt.figure()
+plt.plot(x_positions, prob_amplitude[48,:])
+plt.ylabel(r'$|\Psi_{48}|^{2}$')
+plt.title(r'$|\Psi_{48}|^{2}$')
+plt.savefig('Plots/Psi48.png')
+
+plt.figure()
+plt.plot(x_positions, prob_amplitude[49,:])
+plt.ylabel(r'$|\Psi_{49}|^{2}$')
+plt.title(r'$|\Psi_{49}|^{2}$')
+plt.savefig('Plots/Psi49.png')
+
+plt.figure()
 plt.plot(x_positions, prob_amplitude[50,:])
-plt.show()
-'''
-
-# define the Hamitonian in the presence of the external field
-stat = []
-dyna = [["+-", hop_pm_v,ramp_v,ramp_args], 
-        ["+-", hop_pm_w,ramp_w,ramp_args],
-        ["-+", hop_mp_v,ramp_v_conj,ramp_args],
-        ["-+", hop_mp_w,ramp_w_conj,ramp_args]]
-H_t = hamiltonian(stat,dyna,basis=basis, dtype=np.float64)
-
-Et, Vt = H_t.eigsh(time=0.0, k=1, which='SA')
-print(Vt)
-print(np.sqrt(0.28363019**2+0.13983531**2))
-
-E_0 , psi_0 = H_t.eigsh(time=0.0, k=1,which="SA")
-E,V =H_t.eigh(time=0)
-psi_0 = psi_0[:,0]
-
-# Evolve state in 
-psi_t = H_t.evolve(psi_0,0,t,eom='SE',iterate=True)
-
-# Define current operator
-def current_ramp(t,A_0,omega_0,NN,a):
-    A_t = (A_0*10/omega_0)*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t)
-    return -1j*a*np.exp(-1j*A_t)
-
-def current_ramp_conj(t,A_0,omega_0,NN,a):
-    A_t = (A_0*10/omega_0)*((np.sin(omega_0*t/(2*NN)))**2)*np.sin(omega_0*t)
-    return 1j*a*np.exp(1j*A_t)
-
-current_ramp_args = [A_0,omega_0,NN,a]
-
-current_static = []
-current_dynamic = [["+-", hop_pm_v,current_ramp,current_ramp_args],
-                   ["+-", hop_pm_w,current_ramp,current_ramp_args], 
-                   ["-+", hop_mp_v,current_ramp_conj,current_ramp_args],
-                   ["-+", hop_mp_w,current_ramp_conj,current_ramp_args]]
-current = hamiltonian(current_static,current_dynamic, basis=basis,dtype=np.float64)
-
-# Define current operator
-X_i = [[positions[i],i] for i in range(L)]
-
-displacement_static=[["n",X_i]]
-displacement_dynamic=[]
-displacement = hamiltonian(displacement_static,displacement_dynamic,basis=basis, dtype=np.float64)
-
-print("displacement list",displacement_static)
-
-# calculate expectation values of current operator
-Obs_time = obs_vs_time(psi_t,t,dict(Energy=H_t, Current=current, Displacement=displacement))
-current_time = Obs_time["Current"]
-displacement_time = Obs_time["Displacement"]
-#print(np.size(current_time))
+plt.ylabel(r'$|\Psi_{50}|^{2}$')
+plt.title(r'$|\Psi_{50}|^{2}$')
+plt.savefig('Plots/Psi50.png')
 
 plt.figure()
-plt.plot(t*t_conversion,current_time)
-plt.xlabel('Time (fs)')
-plt.ylabel('Current')
-plt.title("Current vs Time")
-plt.show()
-
-plt.figure()
-plt.plot(t*t_conversion,displacement_time)
-plt.xlabel('Time (fs)')
-plt.ylabel('Displacement')
-plt.title("Displacement vs Time")
-plt.show()
-
-#velocity_time = np.gradient(displacement_time,t)
-#acceleration_time = np.gradie
-
-# Fourier Transformation to obtain current in frequency domain
-T = t[-1]-t[0]        # total time 
-N = num               # Number of steps
-delta_t = t[1]-t[0]   # Time step
-
-
-omega = np.linspace(-1*np.pi/delta_t, np.pi/delta_t, num, endpoint= False)
-delta_omega=omega[1]-omega[0]
-
-factor = np.zeros(num)
-for k in range(num):
-    factor[k] = np.exp(1j*omega[0]*k*delta_t)
-
-current_time = factor*current_time
-J_omega = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.fft(current_time)
-omega_J_omega = omega * J_omega
-S_omega = abs(omega_J_omega)**2
-'''
-'''
-for k in range(num):
-    A_t[k] = np.exp(1j*omega[0]*k*delta_t)*A_t[k]
-'''
-'''
-
-A_t_omega = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.fft(factor*A_t)
-plt.plot(omega,np.abs(A_t_omega)**2)
-plt.yscale('log')
-plt.title("FFT of AT")
-plt.xlim(left=0)
-plt.show()
-
-print("length",np.size(A_t))
-X_t_omega = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.fft(factor*displacement_time)
-plt.plot(omega,np.abs(X_t_omega)**2)
-plt.yscale('log')
-plt.title("FFT of Xt")
-plt.xlim(left=0)
-plt.show()
-
-print("length of X",np.size(displacement_time))
-# Plot J(t) and omega * J(omega) (magnitude)
-plt.figure()
-plt.plot(omega,S_omega)
-plt.yscale('log')
-plt.ylabel("S(Omega)")
-plt.xlim(left=0)
-plt.show()
-
-
-
+plt.plot(x_positions, prob_amplitude[51,:])
+plt.ylabel(r'$|\Psi_{51}|^{2}$')
+plt.title(r'$|\Psi_{51}|^{2}$')
+plt.savefig('Plots/Psi51.png')
