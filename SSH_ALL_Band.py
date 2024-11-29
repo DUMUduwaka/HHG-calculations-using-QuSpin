@@ -16,12 +16,12 @@ delta = 0.15     # Alternating shift of the atos casuing the dimerization (negat
 
 # Declare constants for Vector Potential
 N_cyc = 5                            # Period of the pulse
-omega_0 = 0.075                      # Frequency in a.u
+omega_0 = 0.0075                      # Frequency in a.u
 A_0 = 0.2                            # Amplitude 
 tf = 2*np.pi*N_cyc/omega_0           # Final time
 t_conversion = 2.4188843265864e-2    # Conversion of time from a.u to fs
 
-
+print("final time",tf)
 # Define atomic-site positions
 positions = np.zeros(L)
 for i in range(L):
@@ -49,7 +49,7 @@ for i in range(L-1):
 
 
 # Define the time array and the Vector potential 
-start,stop,num = 0, tf, 200                                   # time in fs
+start,stop,num = 0, tf, 4200                                  # time in fs
 t = np.linspace(start, stop, num=num, endpoint=False)         # Time array
 A_t = A_0*((np.sin(omega_0*t/(2*N_cyc)))**2)*np.sin(omega_0*t)   # Vector Potential
 
@@ -80,7 +80,7 @@ def ramp_w_conj(t,A_0,omega_0,N_cyc,a, delta):
     A_t = A_0*((np.sin(omega_0*t/(2*N_cyc)))**2)*np.sin(omega_0*t) 
     return np.exp(1j*(a+delta)*A_t)
 
-ramp_args = [A_0,omega_0,N_cyc,a, delta]
+ramp_args = [A_0,omega_0,N_cyc,a,delta]
 
 
 ## Construct single -praticle Hamiltonian
@@ -105,6 +105,48 @@ dyna = [["+-", hop_pm_v,ramp_v,ramp_args],
 
 H_t = hamiltonian(stat,dyna,basis=basis, dtype=np.float64)
 
+
+# Define correct current operator
+
+'''
+
+delta_x_v = []
+delta_x_w = []
+
+for i in range(L-1):
+    if i%2 == 0:
+        delta_x_v = delta_x_v + [[positions[1]-positions[0],i,i+1]]
+    
+    else:
+        delta_x_w = delta_x_w + [[positions[2]-positions[1],i,i+1]]
+
+
+def current_ramp_v(t,A_0,omega_0,N_cyc,a):
+    A_t = (A_0/omega_0)*((np.sin(omega_0*t/(2*N_cyc)))**2)*np.sin(omega_0*t)
+    return 0.5*(1j*delta_x_v - delta_x_v**2*A_t)
+
+def current_ramp_w(t,A_0,omega_0,N_cyc,a):
+    A_t = (A_0/omega_0)*((np.sin(omega_0*t/(2*N_cyc)))**2)*np.sin(omega_0*t)
+    return 0.5*(1j*delta_x_w - delta_x_w**2*A_t)
+
+def current_ramp_v_conj(t,A_0,omega_0,N_cyc,a):
+    A_t = (A_0/omega_0)*((np.sin(omega_0*t/(2*N_cyc)))**2)*np.sin(omega_0*t)
+    return 0.5*(-1j*delta_x_v - delta_x_v**2*A_t)
+
+def current_ramp_w_conj(t,A_0,omega_0,N_cyc,a):
+    A_t = (A_0/omega_0)*((np.sin(omega_0*t/(2*N_cyc)))**2)*np.sin(omega_0*t)
+    return 0.5*(-1j*delta_x_w - delta_x_w**2*A_t)
+
+current_ramp_args = [A_0,omega_0,N_cyc,a]
+current_static = []
+current_dynamic = [["+-", hop_pm_v,current_ramp_v,current_ramp_args],
+                   ["+-", hop_pm_w,current_ramp_w,current_ramp_args], 
+                   ["-+", hop_mp_v,current_ramp_v_conj,current_ramp_args],
+                   ["-+", hop_mp_w,current_ramp_w_conj,current_ramp_args]]
+
+'''
+
+
 # Define current operator
 def current_ramp(t,A_0,omega_0,N_cyc,a):
     A_t = (A_0/omega_0)*((np.sin(omega_0*t/(2*N_cyc)))**2)*np.sin(omega_0*t)
@@ -116,15 +158,21 @@ def current_ramp_conj(t,A_0,omega_0,N_cyc,a):
 
 current_ramp_args = [A_0,omega_0,N_cyc,a]
 
+#delat_x_i = [[positions[i],i] for i in range(L)]
+
 current_static = []
 current_dynamic = [["+-", hop_pm_v,current_ramp,current_ramp_args],
                    ["+-", hop_pm_w,current_ramp,current_ramp_args], 
                    ["-+", hop_mp_v,current_ramp_conj,current_ramp_args],
                    ["-+", hop_mp_w,current_ramp_conj,current_ramp_args]]
 
+
+
 current = hamiltonian(current_static,current_dynamic, basis=basis,dtype=np.float64)
 
-# Define current operator
+
+# Define position operator
+
 X_i = [[positions[i],i] for i in range(L)]
 
 displacement_static=[["n",X_i]]
@@ -143,6 +191,7 @@ current_total = np.zeros(len(t))
 displacement_total = np.zeros(len(t))
 
 for i, psi_0 in enumerate(eigenstates):
+    print(i)
     
     #print(f"Eigenstate {i}:")
     #print(psi_0)
@@ -160,7 +209,7 @@ for i, psi_0 in enumerate(eigenstates):
     current_total =+ current_time
     displacement_total =+ displacement_time 
     
-
+velocity_total = np.gradient(displacement_total,t)
 
 plt.figure()
 plt.plot(t*t_conversion,current_total)
@@ -176,6 +225,13 @@ plt.xlabel('Time (fs)')
 plt.ylabel('Displacement')
 plt.title("Displacement vs Time")
 plt.savefig('Plots/Displacement.png')
+
+plt.figure()
+plt.plot(t*t_conversion,velocity_total)
+plt.xlabel('Time (fs)')
+plt.ylabel('Current')
+plt.title("velocity vs Time")
+plt.savefig('Plots/velocity.png')
 
 
 # Fourier Transformation to obtain current in frequency domain
@@ -201,11 +257,14 @@ displacement_total = factor*displacement_total
 X_omega = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.ifft(displacement_total)
 P_omega = abs(omega**2*X_omega)**2
 
-A_t_omega = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.ifft(factor*A_t)
+current_total_total = factor*current_total
+V_omega = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.ifft(current_total)
+Pv_omega = abs(omega*X_omega)**2
 
+A_t_omega = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.ifft(factor*A_t)
 plt.figure()
 plt.plot(omega,np.abs(A_t_omega)**2)
-plt.yscale('log')
+plt.yscale('log') 
 plt.title("FFT of AT")
 plt.xlim(left=0)
 plt.savefig('Plots/FFT of A(t).png')
@@ -219,20 +278,89 @@ plt.xlim(left=0)
 plt.savefig('Plots/FFT of X(t).png')
 
 
+omega_new = omega/omega_0
 # Plot J(t) and omega * J(omega) (magnitude)
 plt.figure()
-plt.plot(omega,S_omega)
+plt.plot(omega_new,S_omega)
 plt.yscale('log')
-plt.ylabel("S(Omega)")
-plt.xlim(left=0)
+plt.ylabel(r'S($\omega$)')
+plt.xlim(0,60)
 plt.savefig('Plots/S(Omega).png')
 
 # Plot P_omega
 plt.figure()
-plt.plot(omega,P_omega)
+plt.plot(omega_new,P_omega)
 plt.yscale('log')
-plt.ylabel("P(Omega)")
-plt.xlim(left=0)
+plt.ylabel(r'P($\omega$)')
+plt.xlim(0,60)
 plt.savefig('Plots/P(Omega).png')
 
+# Plot Pv_omega
+plt.figure()
+plt.plot(omega_new,Pv_omega)
+plt.yscale('log')
+plt.ylabel(r'P($\omega$)')
+plt.xlim(0,60)
+plt.savefig('Plots/Pv(Omega).png')
+
+
+'''
 # Use density matrix to get harmonic spectrum
+Rho = np.zeros((L,L))
+
+print((V[:,1]))
+
+print(np.transpose(np.conjugate(V[:,1])))
+
+
+
+
+eigenstates = [V[:,i] for i in range(int(L/2))]
+print(np.shape(eigenstates))
+
+for i in range(int(L/2)):
+    Rho =+ np.dot(V[:,i],np.transpose(np.conjugate(V[:,i])))
+
+print((Rho))
+
+
+
+
+
+#Evolve Density matrix
+Rho_t = H_t.evolve(Rho, 0,t, eom='LvNE',iterate=True)
+print(type(Rho_t))
+Rho_list = list(Rho_t)
+print(Rho_list[0])
+
+current_dense=current.toarray(time=t[1])
+print("current is :",current_dense)
+
+current_time_den_mat=np.zeros(len(t))
+for i in range(len(t)):
+    mat_1 = Rho_list[i]
+    mat_2 = current.toarray(time=t[i])
+    res = np.dot(mat_1,mat_2)
+    current_time_den_mat[i]= np.trace(res)
+
+#print("Current using the density matrix ", current_time_den_mat)
+plt.figure()
+plt.plot(t*t_conversion,current_time_den_mat)
+plt.xlabel('Time (fs)')
+plt.ylabel('Current')
+plt.title("Current vs Time using density matrix")
+plt.savefig('Plots/Current_density_mat.png')
+
+current_time_den_mat = factor*current_time_den_mat
+J_omega_den_mat = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.ifft(current_time_den_mat)
+omega_J_omega_den_mat = omega * J_omega_den_mat
+S_omega_den = abs(omega_J_omega_den_mat)**2
+
+plt.figure()
+plt.plot(omega,S_omega_den)
+plt.yscale('log')
+plt.ylabel(r'S($\omega$)')
+plt.title(r'S($\omega$) using the density matrix')
+plt.xlim(left=0)
+plt.savefig('Plots/S(Omega)_density_matrix.png')
+'''
