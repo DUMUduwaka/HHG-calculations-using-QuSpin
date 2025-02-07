@@ -11,7 +11,7 @@ import csv
 L = 100           # system size
 J = 1.0           # uniform hopping contribution
 a = 2.0           # Lattice constant in a.u
-delta = 0.15     # Alternating shift of the atos casuing the dimerization (negative for topological phase)
+delta = -0.15     # Alternating shift of the atos casuing the dimerization (negative for topological phase)
 
 
 # Declare constants for Vector Potential
@@ -48,7 +48,7 @@ for i in range(L-1):
         hop_mp_w = hop_mp_w + [[w, i, i+1]]
 
 
-time_steps = [20,10,5,0.5,0.2,0.1]
+time_steps = [10, 5, 2, 1, 0.5, 0.2, 0.1]
 output_file = f"Time Convergence/S_omega_data_δ={delta}.csv"
 
 with open(output_file, mode='w',newline='') as file:
