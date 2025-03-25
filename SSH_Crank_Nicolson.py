@@ -61,7 +61,7 @@ with open(csv_filename, "w", newline="") as file:
 
 
         # Define the time array and the Vector potential 
-        time_step = 0.1 
+        time_step = 1 
         start,stop,num = 0, tf, int(tf/time_step)                        # time in fs
         t = np.linspace(start, stop, num=num, endpoint=False)            # Time array
         A_t = A_0*((np.sin(omega_0*t/(2*N_cyc)))**2)*np.sin(omega_0*t)   # Vector Potential
@@ -136,9 +136,9 @@ with open(csv_filename, "w", newline="") as file:
         plt.xlabel('Time (fs)')
         plt.ylabel('Displacement')
         plt.title("Displacement vs Time")
-        plt.savefig(f'Crank-Nicolson Propagation/Displacement δ = {delta}.png')
+        plt.savefig(f'Crank-Nicolson Propagation/Displacement δ = {delta}, Δt = {time_step}.png')
 
-
+        '''
         velocity_time = np.gradient(displacement_time,t)
         acceleration_time = np.gradient(velocity_time,t)
 
@@ -147,7 +147,8 @@ with open(csv_filename, "w", newline="") as file:
         plt.xlabel('Time (fs)')
         plt.ylabel('Acceleration')
         plt.title("Acceleration vs Time")
-        plt.savefig(f'Crank-Nicolson Propagation/Acceleration δ = {delta}.png')
+        plt.savefig(f'Crank-Nicolson Propagation/Acceleration δ = {delta}, Δt = {time_step}.png')
+        '''
 
         # Fourier Transformation to obtain current in frequency domain
         T = t[-1]-t[0]        # total time 
@@ -163,18 +164,12 @@ with open(csv_filename, "w", newline="") as file:
             factor[k] = np.exp(1j*omega[0]*k*delta_t)
 
         
-
+        omega_new = omega/omega_0
 
         # Fourier Transforamtion of dispalcement and acceleration
         displacement_time = factor*displacement_time*Mask
         X_omega = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.ifft(displacement_time)
         P_omega = abs(omega**2*X_omega)**2
-
-
-        acceleration_time = factor*acceleration_time*Mask
-        A_omega = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.ifft(acceleration_time)
-        P2_omega = abs(A_omega)**2
-        omega_new = omega/omega_0
 
         P_omega_data.append(P_omega)
 
@@ -203,7 +198,7 @@ plt.title("Power Spectrum for Different Delta Values")
 plt.yscale('log')
 plt.legend()
 plt.xlim(0,100)
-plt.savefig(os.path.join(output_dir, "P_omega_comparison.png"))
+plt.savefig(os.path.join(output_dir, f"P_omega_comparison Δt ={time_step}.png"))
 
 '''
 plt.figure()
