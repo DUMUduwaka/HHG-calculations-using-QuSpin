@@ -140,20 +140,18 @@ with open(output_file, mode='w',newline='') as file:
 
 
         E , V = H_t.eigsh(time=0.0, k=L/2,which="SA")
-        # Store eigenstates in a list
-        eigenstates = [V[:,i] for i in range(int(L/2))]
 
-        current_total = np.zeros(len(t))
+        displacement_total = np.zeros(len(t))
 
-        for i, psi_0 in enumerate(eigenstates):
-            # Evolve state 
-            psi_t = H_t.evolve(psi_0,0,t,eom='SE',iterate=True)
-        
-            Obs_time = obs_vs_time(psi_t,t,dict(Energy=H_t,Current=current, Displacement=displacement))
-            current_time = Obs_time["Current"]
-            current_total =+ current_time
+        for s in range(L//2):
+            psi_0 = V[:,s]
+
+            # Evolve State
+            psi_t = H_t.evolve(psi_0,0,t, eom='SE', iterate= True)
+            Obs_time = obs_vs_time(psi_t,t,dict(Displacement=displacement))
             
-
+            displacement_total += np.real(Obs_time["Displacement"])
+            
         # Fourier Transformation to obtain current in frequency domain
         T = t[-1]-t[0]        # total time 
         N = num               # Number of steps
@@ -167,10 +165,12 @@ with open(output_file, mode='w',newline='') as file:
         for k in range(num):
             factor[k] = np.exp(1j*omega[0]*k*delta_t)
 
-        current_total = factor*current_total
-        J_omega = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.ifft(current_total)
-        omega_J_omega = omega * J_omega
-        S_omega = abs(omega_J_omega)**2
+        # Define the mask
+        Mask = A_0*((np.sin(omega_0*t/(2*N_cyc)))**2)
+
+        displacement_total = factor*displacement_total*Mask
+        X_omega = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.ifft(displacement_total)
+        S_omega = abs(omega**2*X_omega)**2
 
 
         omega_new = omega/omega_0
