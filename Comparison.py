@@ -1,18 +1,27 @@
+'''
+Author: Don Usitha Mihiranga Uduwakaarachchi
+Copyright (c) 2025 Don Usitha Mihiranga Uduwakaarachchi
+'''
+
 from quspin.operators import hamiltonian            # Hamiltonians and operators
 from quspin.basis import spinless_fermion_basis_1d  # Hilbert space fermion basis
 from quspin.tools.measurements import obs_vs_time   # Tools for measurements
+from quspin.tools.evolution import evolve           # Evolve function
 import scipy as sp
 import numpy as np  
 import matplotlib.pyplot as plt
 import csv
 import os
 
+# Create output directory if not exists
+output_dir = "Comparison"
+os.makedirs(output_dir, exist_ok=True)
 
 # Define model parameters
 L = 100           # system size
 J = 1.0           # uniform hopping contribution
 a = 2.0           # Lattice constant in a.u
-delta = 0         # Alternating shift of the atos casuing the dimerization (negative for topological phase)
+delta = 0.15      # Alternating shift of the atos casuing the dimerization (negative for topological phase)
 
 
 # Declare constants for Vector Potential
@@ -47,7 +56,7 @@ for i in range(L-1):
 
 
 # Define the time array and the Vector potential 
-time_step = 1 
+time_step = 0.1 
 start,stop,num = 0, tf, int(tf/time_step)                        # time in fs
 t = np.linspace(start, stop, num=num, endpoint=False)            # Time array
 A_t = A_0*((np.sin(omega_0*t/(2*N_cyc)))**2)*np.sin(omega_0*t)   # Vector Potential
@@ -140,34 +149,39 @@ for s in range(L//2):
     
     displacement_total_QS += np.real(Obs_time["Displacement"])
 
+####################################
+######  LiNE equation Method  ######
+####################################
 
-###############################
-######  Density Matrix  #######
-###############################
+##### define LiNE equation in diagonal form
+def LiNE_EOM(time, rho):
+    rho = rho.reshape((L,L))
+    rho_dot = -1j * (np.matmul(H_t.toarray(time=time),rho)-np.matmul(rho,H_t.toarray(time=time)))
+ 
+    return rho_dot.ravel()
 
-V_evolved = H_t.evolve(V,0,t,eom='SE',iterate=True)
-V_evolved_list = list(V_evolved)
 
-displacement_total_DM = np.zeros(len(t))
-for i in range(L//2):
-     
-    displacement_time = np.zeros(len(t))
-    for time in range(len(t)):
-        state = V_evolved_list[time]
-        #Rho = np.zeros((L,L))
+#Initial Density Matirx
+Rho = np.zeros((L,L),dtype=complex)
+for i in range (L//2):
+    mat_1 = V[:,i].reshape(-1,1)
+    mat_2 = np.conjugate(V[:,i]).reshape(1,-1)
+    Rho += np.dot(mat_1,mat_2)
+rho0 = Rho
 
-        mat_1 = state[:,i].reshape(-1,1)
-        mat_2 = np.conjugate(state[:,i]).reshape(1,-1)
-        Rho = np.matmul(mat_1,mat_2)
+#Evolve density Matrix
+rho_t = evolve(rho0,t[0],t,LiNE_EOM,iterate=True,atol=1E-12,rtol=1E-12)
 
-        mat_3 = displacement.toarray(time=t[time])
 
-        res = np.matmul(Rho, mat_3)
+displacement_total_LV = np.zeros(len(t))
+current_time = np.zeros(len(t))
+for i, rho_flattened in enumerate(rho_t):
+    rho = rho_flattened.reshape(H_t.Ns, H_t.Ns)
+    mat_dis = displacement.toarray(time=t[i])
+    
+    res_dis = np.matmul(rho,mat_dis)
 
-        displacement_time[time]=np.trace(res)
-        
-    displacement_total_DM += displacement_time
-
+    displacement_total_LV[i]= np.trace(res_dis)
 
 # Fourier Transformation to obtain current in frequency domain
 T = t[-1]-t[0]        # total time 
@@ -197,48 +211,61 @@ displacement_total_QS = factor*displacement_total_QS*Mask
 X_omega_QS = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.ifft(displacement_total_QS)
 P_omega_QS = abs(omega**2*X_omega_QS)**2
 
-displacement_total_DM = factor*displacement_total_DM*Mask
-X_omega_DM = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.ifft(displacement_total_DM)
+displacement_total_LV = factor*displacement_total_LV*Mask
+X_omega_DM = (delta_t/(np.sqrt(2*np.pi)))*N*sp.fft.ifft(displacement_total_LV)
 P_omega_DM = abs(omega**2*X_omega_DM)**2
 
-# Plot P_omega
+## Plot High Harmonic Spectra
 plt.figure(figsize=(10, 8))
 plt.plot(omega_new,P_omega_CN,linewidth=1.0, color='r', label = 'Crank-Nicolson')
 plt.plot(omega_new,P_omega_QS,linewidth=1.0, color='k', label ='QuSpin Operators')
-plt.plot(omega_new,P_omega_DM,linewidth=1.0, color='g', label = 'Density Matrix')
+plt.plot(omega_new,P_omega_DM,linewidth=1.0, color='g', label = 'LvNE eom')
 plt.yscale('log')
-plt.ylabel(r'P($\omega$) using displacement')
+plt.ylabel(r'P($\omega$)')
 plt.title(f'P($\Omega$) Comparison δ = {delta}, Δt = {time_step}')
 plt.xlim(0,100)
 plt.legend(loc='best')
-plt.savefig(f'P(Omega) Comparison for different methods δ = {delta}, Δt = {time_step}.png')
+plt.savefig(f'Comparison/P(Omega) Comparison for different methods δ = {delta}, Δt = {time_step}.png')
 
 
-# Subplots
-fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(25, 6))
-fig.suptitle(f'P($\Omega$) Comparison δ = {delta}, Δt = {time_step}', fontsize=16)
+fig, ((ax1, ax2), (ax3,ax4)) = plt.subplots(2, 2, figsize=(16, 10))
+fig.suptitle(f'P($\omega$) using different methods, δ = {delta}, Δt = {time_step}', fontsize=16)
 
 # Plot for Crank-Nicolson method
 ax1.plot(omega_new, P_omega_CN, linewidth=1.0, color='r')
 ax1.set_yscale('log')
-ax1.set_ylabel(r'P($\omega$) using displacement')
-ax1.set_title('Crank-Nicolson')
+ax1.set_ylabel(r'P($\omega$)')
+ax1.set_xlabel(r'$\omega/\omega_0$')
+ax1.set_title('Crank-Nicolson Method')
 ax1.set_xlim(0, 100)
 
 # Plot for QuSpin Operators method
 ax2.plot(omega_new, P_omega_QS, linewidth=1.0, color='k')
 ax2.set_yscale('log')
-ax2.set_ylabel(r'P($\omega$) using displacement')
-ax2.set_title('QuSpin Operators')
+ax2.set_ylabel(r'P($\omega$)')
+ax2.set_xlabel(r'$\omega/\omega_0$')
+ax2.set_title('QuSpin Operators Method')
 ax2.set_xlim(0, 100)
 
 # Plot for Density Matrix method
 ax3.plot(omega_new, P_omega_DM, linewidth=1.0, color='g')
 ax3.set_yscale('log')
-ax3.set_ylabel(r'P($\omega$) using displacement')
-ax3.set_title('Density Matrix')
+ax3.set_ylabel(r'P($\omega$)')
+ax3.set_xlabel(r'$\omega/\omega_0$')
+ax3.set_title('LvNE eom Method')
 ax3.set_xlim(0, 100)
+
+# Plot for Density Matrix method
+ax4.plot(omega_new,P_omega_CN,linewidth=1.0, color='r', label = 'Crank-Nicolson')
+ax4.plot(omega_new,P_omega_QS,linewidth=1.0, color='k', label ='QuSpin Operators')
+ax4.plot(omega_new,P_omega_DM,linewidth=1.0, color='g', label = 'LvNE eom')
+ax4.set_yscale('log')
+ax4.set_ylabel(r'P($\omega$)')
+ax4.set_xlabel(r'$\omega/\omega_0$')
+ax4.legend()
+ax4.set_title(f'Comparison')
+ax4.set_xlim(0, 100)
 
 # Adjust layout and save figure
 plt.tight_layout()
-plt.savefig(f'P(Omega) Comparison for different methods δ = {delta}, Δt = {time_step} subplots.png')
+plt.savefig(f'Comparison/P(Omega) using different methods δ = {delta}, Δt = {time_step} subplots.png')
