@@ -1,3 +1,8 @@
+'''
+Author: Don Usitha Mihiranga Uduwakaarachchi
+Copyright (c) 2025 Don Usitha Mihiranga Uduwakaarachchi
+'''
+
 from quspin.operators import hamiltonian            # Hamiltonians and operators
 from quspin.basis import spinless_fermion_basis_1d  # Hilbert space fermion basis
 from quspin.tools.measurements import obs_vs_time   # Tools for measurements
@@ -7,6 +12,10 @@ import matplotlib.pyplot as plt
 import csv
 import os
 
+###########################################
+######  Crank-Nicolson Propagation  #######
+###########################################
+
 # Create output directory if not exists
 output_dir = "Crank-Nicolson Propagation"
 os.makedirs(output_dir, exist_ok=True)
@@ -15,7 +24,7 @@ os.makedirs(output_dir, exist_ok=True)
 L = 100           # system size
 J = 1.0           # uniform hopping contribution
 a = 2.0           # Lattice constant in a.u
-delta_values = [0.15 , - 0.15, 0]     # Alternating shift of the atos casuing the dimerization (negative for topological phase)
+delta_values = [0.15 , - 0.15]     # Alternating shift of the atos casuing the dimerization (negative for topological phase)
 
 
 # Declare constants for Vector Potential
@@ -51,17 +60,17 @@ with open(csv_filename, "w", newline="") as file:
         hop_mp_v = []
         hop_mp_w = []
 
-        for i in range(L-1):
+        for i in range(L):
             if i%2 == 0:
-                hop_pm_v = hop_pm_v + [[-v, i, i+1]]
-                hop_mp_v = hop_mp_v + [[v, i, i+1]]
+                hop_pm_v = hop_pm_v + [[-v, i, (i+1)%L]] #i+1
+                hop_mp_v = hop_mp_v + [[v, i, (i+1)%L]]
             else:
-                hop_pm_w = hop_pm_w + [[-w, i, i+1]]
-                hop_mp_w = hop_mp_w + [[w, i, i+1]]
+                hop_pm_w = hop_pm_w + [[-w, i, (i+1)%L]]
+                hop_mp_w = hop_mp_w + [[w, i, (i+1)%L]]
 
 
         # Define the time array and the Vector potential 
-        time_step = 1 
+        time_step = 0.1 
         start,stop,num = 0, tf, int(tf/time_step)                        # time in fs
         t = np.linspace(start, stop, num=num, endpoint=False)            # Time array
         A_t = A_0*((np.sin(omega_0*t/(2*N_cyc)))**2)*np.sin(omega_0*t)   # Vector Potential
@@ -100,12 +109,13 @@ with open(csv_filename, "w", newline="") as file:
 
         H_t = hamiltonian(stat,dyna,basis=basis, dtype=np.float64)
 
+        # Solving the time-dependent Hamiltonian to obatin L/2 number of eigenstates correspond to lowest eigenvalues
         E , V = H_t.eigsh(time=0.0, k=L/2,which="SA")
 
         delta_t = t[1]-t[0]   # Time step
         I = np.eye(L)
 
-
+        # Define time-evolution funtion
         def evolve_state(t,state):
             H = H_t.toarray(time=t+delta_t/2)
             mat_a = I+1j*H*delta_t/2
@@ -113,6 +123,7 @@ with open(csv_filename, "w", newline="") as file:
 
         displacement_time = np.zeros(len(t))
 
+        # Calculate expectation value of displacement
         for time in range(len(t)):
             if time==0:
                 state = V
@@ -135,20 +146,8 @@ with open(csv_filename, "w", newline="") as file:
         plt.plot(t*t_conversion,displacement_time*Mask)
         plt.xlabel('Time (fs)')
         plt.ylabel('Displacement')
-        plt.title("Displacement vs Time")
+        plt.title(f"Displacement vs Time δ = {delta}")
         plt.savefig(f'Crank-Nicolson Propagation/Displacement δ = {delta}, Δt = {time_step}.png')
-
-        '''
-        velocity_time = np.gradient(displacement_time,t)
-        acceleration_time = np.gradient(velocity_time,t)
-
-        plt.figure()
-        plt.plot(t*t_conversion,acceleration_time*Mask)
-        plt.xlabel('Time (fs)')
-        plt.ylabel('Acceleration')
-        plt.title("Acceleration vs Time")
-        plt.savefig(f'Crank-Nicolson Propagation/Acceleration δ = {delta}, Δt = {time_step}.png')
-        '''
 
         # Fourier Transformation to obtain current in frequency domain
         T = t[-1]-t[0]        # total time 
@@ -173,54 +172,31 @@ with open(csv_filename, "w", newline="") as file:
 
         P_omega_data.append(P_omega)
 
-        # Plot P_omega
+        ## Plot High Harmonic Spectra
         plt.figure(figsize=(8, 6))
         plt.plot(omega_new,P_omega,linewidth=1.0)
         plt.yscale('log')
-        plt.ylabel(r'P($\omega$) using displacement')
-        plt.title(f'P($\Omega$) using Displacement δ = {delta}, Δt = {time_step}')
+        plt.ylabel(r'P($\omega$)')
+        plt.xlabel(r'$\omega/\omega_0$')
+        plt.title(f'P($\omega$) using Crank-Nicolson method including PBC δ = {delta}')
         plt.xlim(0,100)
-        plt.savefig(f'Crank-Nicolson Propagation/P(Omega) using Displacement δ = {delta}, Δt = {time_step}.png')
+        plt.savefig(f'Crank-Nicolson Propagation/P(omega) using Crank-Nicolson method including PBC δ = {delta}, Δt = {time_step}.png')
     
     # Write data to CSV file
     for i in range(len(omega)):
         writer.writerow([omega_new[i]] + [P_omega_data[j][i] for j in range(len(delta_values))])
 
 
-# Prepare plot
+## Plot High Harmonic Spectra
 colors = ['r','k','g']
 plt.figure(figsize=(10, 8))
 for i, delta in enumerate(delta_values):
     plt.plot(omega / omega_0, P_omega_data[i], label=f"$\delta$={delta}",linewidth=1.0, color=colors[i])
 
-plt.ylabel(r'P($\omega$) using displacement')
-plt.title("Power Spectrum for Different Delta Values")
+plt.ylabel(r'P($\omega$)')
+plt.xlabel(r'$\omega/\omega_0$')
+plt.title(f"High Harmonic Spectrum for Different Delta Values including PBC Δt ={time_step}")
 plt.yscale('log')
 plt.legend()
 plt.xlim(0,100)
-plt.savefig(os.path.join(output_dir, f"P_omega_comparison Δt ={time_step}.png"))
-
-'''
-plt.figure()
-plt.plot(omega_new,np.abs(X_omega)**2)
-plt.yscale('log')
-plt.title("FFT of X(t)")
-plt.xlim(0,100)
-plt.savefig(f'Crank-Nicolson Propagation/FFT of X(t) δ = {delta}.png')
-
-# Plot P_omega
-plt.figure()
-plt.plot(omega_new,P_omega)
-plt.yscale('log')
-plt.ylabel(r'P($\omega$) using displacement')
-plt.xlim(0,100)
-plt.savefig(f'Crank-Nicolson Propagation/P(Omega) using Displacement δ = {delta}, Δt = {time_step}.png')
-
-# Plot P_omega
-plt.figure()
-plt.plot(omega_new,P2_omega)
-plt.yscale('log')
-plt.ylabel(r'P($\omega$) using Accerlation')
-plt.xlim(0,100)
-plt.savefig(f'Crank-Nicolson Propagation/P(Omega) using Acceleration δ = {delta}, Δt = {time_step}.png')
-'''
+plt.savefig(os.path.join(output_dir, f"P_omega_comparison including PBC Δt ={time_step}.png"))
