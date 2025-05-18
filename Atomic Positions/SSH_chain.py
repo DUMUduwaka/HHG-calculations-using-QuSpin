@@ -1,13 +1,18 @@
+'''
+Author: Don Usitha Mihiranga Uduwakaarachchi
+Copyright (c) 2025 Don Usitha Mihiranga Uduwakaarachchi
+'''
+
 import scipy as sp
 import numpy as np  
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
 # Define model parameters
-L = 100           # system size
+L = 20           # system size
 J = 1.0           # uniform hopping contribution
 a = 2.0           # Lattice constant in a.u
-delta = -0.15    # Alternating shift of the atos casuing the dimerization (negative for topological phase)
+delta = 0    # Alternating shift of the atos casuing the dimerization (negative for topological phase)
 
 # Define atomic-site positions
 positions = np.zeros(L)
@@ -19,7 +24,7 @@ plt.figure(figsize=(15, 3))
 plt.scatter(positions, np.zeros(L), color='blue', label='Atomic Sites')
 plt.axhline(0, color='gray', linestyle='--', linewidth=0.5)  # Add reference line
 plt.xlabel("Position (a.u.)")
-plt.title("Atomic Positions in the SSH Chain")
+plt.title(f"Atomic Positions in the SSH Chain δ = {delta}")
 plt.yticks([])  # Remove y-axis ticks
 plt.legend()
 plt.grid(axis='x', linestyle='--', linewidth=0.5, alpha=0.7)
