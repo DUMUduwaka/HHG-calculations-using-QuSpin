@@ -1,0 +1,28 @@
+model:
+  num_lattice_points: 100
+  lattice_constant: 2.0
+  delta: 0.15
+  boundary_condition: open
+  phase_distance_mode: legacy
+  num_particles_per_basis: 1
+
+vector_potential:
+  num_cycles: 5
+  frequency: 0.0075
+  amplitude: 0.2
+
+time:
+  delta_t: 1.0
+  t_start: 0.0
+  t_stop: null
+  endpoint: false
+
+spectrum:
+  use_pulse_mask: true
+  max_harmonic_order: 100
+
+output:
+  root_dir: results
+  run_name: quspin_operator
+
+solver: quspin
